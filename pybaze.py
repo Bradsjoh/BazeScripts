@@ -1,43 +1,59 @@
 import numpy as N
 import requests as r
 import json
-import pandas 
-
-serverName = 'https://demo.bazefield.com/Bazefield.Services/api'
-user = 'Administrator'
-password = 'B@ze!2015'
-query = 'measurements/[WFU-T09-WindSpeed,WFU-T09-ActivePower,WFU-T11-WindSpeed,WFU-T11-ActivePower]/aggregates/[3,3,3,3]/from/*-7d/to/*/interval/600000?format=json'
+import pandas
+from datetime import datetime
 
 class pyBaze:
 
-    def __init__(self, serverName = serverName, username = user, password = password):
+    def __init__(self, serverName, apiKey, rootApiUrl='/Bazefield.Services/api'):
         """
         Initialize a connection to baze demo server, and return a pyBaze server object
         """
-        self.serverName = serverName
-        self.userName = username
-        self.password = password 
-        response = self.authenticate()
-        jsondata = json.loads(response.text)
-        self.sessionId = jsondata['sessionId']
+        self.baseUrl = serverName + rootApiUrl
+        self.apiKey = apiKey
+        self.bearer = 'Bearer ' + apiKey
+        self.header = {'mediaType':'application/json','Authorization':self.bearer}
 
-    def authenticate(self, mediaType="application/json"):
+    def getRawMeasurementsJson(self, tag, start, end):
+        apiQuery = '/measurements/' + tag + '/from/' + start + '/to/' + end + '?format=json'
+        dataresponse = r.get(self.baseUrl+apiQuery, headers=self.header)
+        data = json.loads(dataresponse.text)
+        return data
+		
+    def getRawMeasurementsPandas(self, tag, start, end):
         """
-        Authenticate a session based on username and password
+        Return raw data in the form of a pandas array from a query and authenticated session
         """
-        urlstr = "/auth/baze?format=json"
-        payload = {"UserName": self.userName, "Password": self.password, "mediaType":mediaType}
-        response = r.post(serverName+urlstr, data = payload)
-        return response
-
-    def getJsonData(self, query):
-        """
-        Return data in the form of a pandas DataFrame from a query and authenticated session
-        """
-        dataresponse = r.get(self.serverName+query, headers={'MediaType':'application/json','x-ss-id':self.sessionId})
-        data = json.loads(dataresponse.text)['timeSeriesList'][0]['timeSeries']
-        pd = pandas.DataFrame(data)
+        pd = pandas.DataFrame()
+        data = self.getRawMeasurementsJson(tag,start,end)
+        tempPd = pandas.DataFrame(data['timeSeriesList'][0]['timeSeries'])
+        name = data['timeSeriesList'][0]['measurementName']
+        pd['TimeUtc'] = [datetime.fromtimestamp(i/1000) for i in tempPd['t']]
+        pd[name] = tempPd['v']
         return pd
+		
+    def getAggregatesJson(self, tag, start, end, aggregate, intervalSec):
+        interval = str(intervalSec*1000)
+        apiQuery = '/measurements/' + tag + '/aggregates/' + aggregate + '/from/' + start + '/to/' + end + '/interval/' + interval + '?format=json'
+        dataresponse = r.get(self.baseUrl+apiQuery, headers=self.header)
+        data = json.loads(dataresponse.text)
+        return data
+		
+    def getAggregatesPandas(self, tags, start, end, aggregate, intervalSec):
+        pd = pandas.DataFrame()
+        if type(tags) == str:
+            tags = [tags]
+        for tag in tags:
+            tempJson = self.getAggregatesJson(tag,start,end,aggregate,intervalSec)
+            tempPd = pandas.DataFrame(tempJson['timeSeriesList'][0]['timeSeries'])
+            name = tempJson['timeSeriesList'][0]['measurementName']
+            pd['TimeUtc'] = [datetime.fromtimestamp(i/1000) for i in tempPd['t']]
+            pd[name] = tempPd['v']
+        return pd
+			
+			
+	
 
 
 
