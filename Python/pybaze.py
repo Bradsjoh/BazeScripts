@@ -34,6 +34,9 @@ class pyBaze:
         return pd
 		
     def getAggregatesJson(self, tag, start, end, aggregate, intervalSec):
+        """
+		Return tag(s) in json
+        """
         interval = str(intervalSec*1000)
         apiQuery = '/measurements/' + tag + '/aggregates/' + aggregate + '/from/' + start + '/to/' + end + '/interval/' + interval + '?format=json'
         dataresponse = r.get(self.baseUrl+apiQuery, headers=self.header)
@@ -41,6 +44,9 @@ class pyBaze:
         return data
 		
     def getAggregatesPandas(self, tags, start, end, aggregate, intervalSec):
+        """
+        Return tag(s) in a pandas dataFrame
+        """
         pd = pandas.DataFrame()
         if type(tags) == str:
             tags = [tags]
@@ -51,6 +57,28 @@ class pyBaze:
             pd['TimeUtc'] = [datetime.fromtimestamp(i/1000) for i in tempPd['t']]
             pd[name] = tempPd['v']
         return pd
+
+    def getAllocationsJson(self, allocationType, assets, start, end):
+        """
+        Return raw allocations to Json
+		"""
+        apiQuery = '/allocations/' + allocationType + '/from/' + start + '/to/' + end + '?turbineids=' + assets + '&format=json'
+        dataresponse = r.get(self.baseUrl+apiQuery, headers=self.header)
+        data = json.loads(dataresponse.text)
+        return data
+
+    def getAllocationStats(self, allocationType, assets, start, end, includeAvailable = 1, includeExcluded = 1, groupBy='categories'):
+        """
+        Return allocation stats to json
+		"""
+        apiQuery = '/turbines/allocations/' + allocationType + '/statistics/from/' + start + '/to/' + end + '?turbineids=' + assets + '&includeAvailable=' + str(includeAvailable) + '&includeExcluded=' + str(includeExcluded) + '&chartGroup=' + groupBy + '&format=json'
+        dataresponse = r.get(self.baseUrl+apiQuery, headers=self.header)
+        self.baseUrl+apiQuery
+        data = json.loads(dataresponse.text)
+        return data
+
+
+	
 			
 			
 	
